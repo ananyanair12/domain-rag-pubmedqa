@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+chroma_store*/
+models/
+data/raw/
+data/processed/
+*.log
+.DS_Store
+venv/
+.venv/
+outputs/
+wandb/

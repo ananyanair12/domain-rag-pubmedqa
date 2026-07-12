@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: rag-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./chroma_store:/app/chroma_store
+      - ./models:/app/models
+      - ./results:/app/results
+
+  dashboard:
+    build: .
+    container_name: rag-dashboard
+    command: ["streamlit", "run", "dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./chroma_store:/app/chroma_store
+      - ./models:/app/models
+      - ./results:/app/results
+    depends_on:
+      - api
