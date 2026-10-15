@@ -12,6 +12,8 @@ except Exception:  # pragma: no cover - optional dependency
 
 from src.config import config
 from src.embeddings import get_embedder
+from pathlib import Path
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
 class _SimpleCollection:
@@ -69,22 +71,23 @@ def collection_name(embedder_kind: str, chunk_size: int) -> str:
     return f"pubmedqa_{embedder_kind}_{chunk_size}"
 
 
-def build_collection(embedder_kind: str, chunk_size: int = None):
+def build_collection(embedder_kind: str, chunk_size=None):
     """
     embedder_kind: "baseline" or "finetuned"
-    Embeds every chunk at the given size with the chosen embedder and
-    writes them into a dedicated Chroma collection.
+    chunk_size: "128", "256", "512" or "whole" (matches data/chunks_<size>.jsonl)
+    Embeds every chunk with the chosen embedder and stores it in its own
+    Chroma collection, keeping the PMID of each chunk as metadata.
     """
     chunk_size = chunk_size or config.SELECTED_CHUNK_SIZE
-    chunks_path = f"{config.DATA_PROCESSED_DIR}/chunks_{chunk_size}.jsonl"
+    chunks_path = DATA_DIR / f"chunks_{chunk_size}.jsonl"
 
-    with open(chunks_path, "r") as f:
+    with open(chunks_path, "r", encoding="utf-8") as f:
         chunks = [json.loads(line) for line in f]
 
     embedder = get_embedder(embedder_kind)
     texts = [c["text"] for c in chunks]
-    ids = [c["id"] for c in chunks]
-    metadatas = [c.get("metadata", {}) for c in chunks]
+    ids = [c["chunk_id"] for c in chunks]
+    metadatas = [{"pmid": str(c["pmid"])} for c in chunks]
 
     print(f"Embedding {len(texts)} chunks with {embedder_kind} model...")
     embeddings = embedder.encode(texts, show_progress_bar=True, batch_size=32)
@@ -99,10 +102,16 @@ def build_collection(embedder_kind: str, chunk_size: int = None):
         pass
     collection = client.create_collection(name=name)
 
-    collection.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)
+    BATCH = 2000
+    for i in range(0, len(ids), BATCH):
+        collection.add(
+            ids=ids[i:i + BATCH],
+            embeddings=embeddings[i:i + BATCH],
+            documents=texts[i:i + BATCH],
+            metadatas=metadatas[i:i + BATCH],
+        )
     print(f"Indexed {len(ids)} chunks into collection '{name}'")
     return name
-
 
 def query_collection(query: str, embedder_kind: str, chunk_size: int = None, top_k: int = None):
     chunk_size = chunk_size or config.SELECTED_CHUNK_SIZE
