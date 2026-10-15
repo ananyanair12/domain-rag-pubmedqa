@@ -1,75 +1,59 @@
-"""
-Downloads PubMedQA (pqa_labeled subset) via HuggingFace `datasets`,
-and splits it into:
-  - a training pool used to build contrastive fine-tuning pairs
-  - a held-out evaluation pool used ONLY for retrieval / RAGAs evaluation
-
-Run this once, locally or on Colab:
-    python data/download_pubmedqa.py
-
-Swap the `load_dataset(...)` call for "financial_phrasebank"/FiQA or CUAD
-if you choose the fintech or legal variant instead of biomedical.
-"""
-import json
-import os
-import random
-
+import json, random
+from pathlib import Path
 from datasets import load_dataset
 
-RAW_DIR = "./data/raw"
-PROCESSED_DIR = "./data/processed"
-EVAL_HOLD_OUT_RATIO = 0.15  # 15% of Q/A pairs reserved strictly for evaluation
-SEED = 42
+random.seed(42)
+OUT = Path(__file__).parent
+N_TRAIN = 20000        # homework pairs (kept small so Colab is fast)
+N_DISTRACTORS = 10000  # extra abstracts in the library
 
+def text_of(ex):
+    return " ".join(ex["context"]["contexts"]).strip()
+
+def write_jsonl(path, rows):
+    with open(path, "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 def main():
-    os.makedirs(RAW_DIR, exist_ok=True)
-    os.makedirs(PROCESSED_DIR, exist_ok=True)
+    print("Downloading (first time takes a few minutes)...")
+    labeled = load_dataset("qiaojin/PubMedQA", "pqa_labeled", split="train")
+    artificial = load_dataset("qiaojin/PubMedQA", "pqa_artificial", split="train")
+    unlabeled = load_dataset("qiaojin/PubMedQA", "pqa_unlabeled", split="train")
 
-    print("Downloading PubMedQA (pqa_labeled)...")
-    ds = load_dataset("pubmed_qa", "pqa_labeled", split="train")
-    ds.to_json(f"{RAW_DIR}/pubmedqa_labeled_raw.jsonl")
+    # EXAM: labeled questions only
+    eval_rows = [{
+        "pmid": str(ex["pubid"]),
+        "question": ex["question"],
+        "long_answer": ex.get("long_answer", ""),
+        "final_decision": ex.get("final_decision", ""),
+    } for ex in labeled]
+    exam_ids = {r["pmid"] for r in eval_rows}
 
-    records = []
-    for row in ds:
-        # Each row: question, context (list of sentences), long_answer, final_decision
-        context_text = " ".join(row["context"]["contexts"]) if row.get("context") else ""
-        if not context_text or not row.get("question"):
-            continue
-        records.append(
-            {
-                "question": row["question"],
-                "context": context_text,
-                "long_answer": row.get("long_answer", ""),
-                "label": row.get("final_decision", ""),
-            }
-        )
+    # HOMEWORK: artificial pairs, never overlapping the exam
+    art = [ex for ex in artificial if str(ex["pubid"]) not in exam_ids]
+    random.shuffle(art)
+    train_rows = [{
+        "pmid": str(ex["pubid"]),
+        "question": ex["question"],
+        "passage": text_of(ex),
+    } for ex in art[:N_TRAIN]]
 
-    random.seed(SEED)
-    random.shuffle(records)
+    # LIBRARY: exam abstracts + unlabeled distractors
+    corpus = {str(ex["pubid"]): text_of(ex) for ex in labeled}
+    unl = list(unlabeled)
+    random.shuffle(unl)
+    for ex in unl[:N_DISTRACTORS]:
+        corpus.setdefault(str(ex["pubid"]), text_of(ex))
+    corpus_rows = [{"pmid": k, "text": v} for k, v in corpus.items() if v]
 
-    n_eval = int(len(records) * EVAL_HOLD_OUT_RATIO)
-    eval_records = records[:n_eval]
-    train_records = records[n_eval:]
+    # Safety check: no exam question in homework
+    assert not ({r["pmid"] for r in train_rows} & exam_ids), "LEAK!"
 
-    with open(f"{PROCESSED_DIR}/train_pairs.jsonl", "w") as f:
-        for r in train_records:
-            f.write(json.dumps(r) + "\n")
-
-    with open(f"{PROCESSED_DIR}/eval_queries.jsonl", "w") as f:
-        for r in eval_records:
-            f.write(json.dumps(r) + "\n")
-
-    # The full corpus (all contexts) is what gets chunked + indexed.
-    with open(f"{PROCESSED_DIR}/corpus.jsonl", "w") as f:
-        for r in records:
-            f.write(json.dumps({"question": r["question"], "context": r["context"]}) + "\n")
-
-    print(f"Total records: {len(records)}")
-    print(f"Train pool (for fine-tuning): {len(train_records)}")
-    print(f"Held-out eval pool (untouched during fine-tuning): {len(eval_records)}")
-    print(f"Saved to {PROCESSED_DIR}/")
-
+    write_jsonl(OUT / "eval_questions.jsonl", eval_rows)
+    write_jsonl(OUT / "train_pairs.jsonl", train_rows)
+    write_jsonl(OUT / "corpus.jsonl", corpus_rows)
+    print("eval:", len(eval_rows), "| train:", len(train_rows), "| corpus:", len(corpus_rows))
 
 if __name__ == "__main__":
     main()
