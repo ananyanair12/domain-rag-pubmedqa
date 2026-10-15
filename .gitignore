@@ -12,3 +12,7 @@ venv/
 .venv/
 outputs/
 wandb/
+data/*.jsonl
+models/
+results/
+chroma_db/

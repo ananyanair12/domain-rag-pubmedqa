@@ -133,6 +133,21 @@ def _save_result(filename: str, data: dict):
     with open(f"{config.RESULTS_DIR}/{filename}", "w") as f:
         json.dump(data, f, indent=2)
 
+# ---- PMID-based relevance (Phase B) ----
+def precision_at_k_pmid(retrieved_pmids, gold_pmid, k=5):
+    """Fraction of the top-k results that come from the gold abstract."""
+    top = retrieved_pmids[:k]
+    return sum(p == gold_pmid for p in top) / k
 
+def hit_at_k(retrieved_pmids, gold_pmid, k=5):
+    """1 if the gold abstract appears anywhere in the top-k, else 0."""
+    return float(gold_pmid in retrieved_pmids[:k])
+
+def reciprocal_rank(retrieved_pmids, gold_pmid):
+    """1/rank of the first correct result (1.0 = first place, 0 = not found)."""
+    for rank, p in enumerate(retrieved_pmids, 1):
+        if p == gold_pmid:
+            return 1 / rank
+    return 0.0
 if __name__ == "__main__":
     run_before_after_comparison()
