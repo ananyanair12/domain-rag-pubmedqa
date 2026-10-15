@@ -33,7 +33,7 @@ with tab_query:
     with col1:
         question = st.text_input("Ask a biomedical question:", placeholder="e.g. Does aspirin reduce risk of colorectal cancer?")
     with col2:
-        embedder_choice = st.selectbox("Embedder", ["finetuned", "baseline"])
+        embedder_choice = st.selectbox("Embedder", ["baseline", "finetuned"])
         use_reranker = st.checkbox("Use reranker", value=True)
 
     if st.button("Run query", type="primary") and question:

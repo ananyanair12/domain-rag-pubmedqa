@@ -22,7 +22,7 @@ app = FastAPI(
 
 class QueryRequest(BaseModel):
     question: str
-    embedder: str = "finetuned"   # "finetuned" or "baseline"
+    embedder: str = "baseline"   # "baseline" or "finetuned"
     use_reranker: bool = True
 
 

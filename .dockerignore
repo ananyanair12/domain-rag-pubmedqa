@@ -1,0 +1,11 @@
+.venv
+venv
+_old_shim
+.git
+.pytest_cache
+__pycache__
+data
+results
+models
+chroma_db
+*.pyc
