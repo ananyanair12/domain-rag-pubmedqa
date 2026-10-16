@@ -4,6 +4,7 @@ embedding models (at the selected chunk size), so retrieval quality
 can be compared side by side using the SAME underlying chunks.
 """
 import json
+from typing import Optional, Union
 
 try:
     import chromadb
@@ -67,11 +68,11 @@ def get_client():
     return chromadb.PersistentClient(path=config.CHROMA_PERSIST_DIR)
 
 
-def collection_name(embedder_kind: str, chunk_size: int) -> str:
+def collection_name(embedder_kind: str, chunk_size: Union[str, int]) -> str:
     return f"pubmedqa_{embedder_kind}_{chunk_size}"
 
 
-def build_collection(embedder_kind: str, chunk_size=None):
+def build_collection(embedder_kind: str, chunk_size: Optional[Union[str, int]] = None):
     """
     embedder_kind: "baseline" or "finetuned"
     chunk_size: "128", "256", "512" or "whole" (matches data/chunks_<size>.jsonl)
@@ -113,7 +114,12 @@ def build_collection(embedder_kind: str, chunk_size=None):
     print(f"Indexed {len(ids)} chunks into collection '{name}'")
     return name
 
-def query_collection(query: str, embedder_kind: str, chunk_size: int = None, top_k: int = None):
+def query_collection(
+    query: str,
+    embedder_kind: str,
+    chunk_size: Optional[Union[str, int]] = None,
+    top_k: int = None,
+):
     chunk_size = chunk_size or config.SELECTED_CHUNK_SIZE
     top_k = top_k or config.TOP_K_RETRIEVAL
 

@@ -9,3 +9,4 @@ results
 models
 chroma_db
 *.pyc
+chroma_store/

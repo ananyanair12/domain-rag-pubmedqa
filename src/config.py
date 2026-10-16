@@ -27,8 +27,8 @@ class Config:
     )
 
     # --- Chunking ---
-    CHUNK_SIZES_TO_ABLATE = [256, 512, 1024]
-    SELECTED_CHUNK_SIZE = int(os.getenv("SELECTED_CHUNK_SIZE", "512"))
+    CHUNK_SIZES_TO_ABLATE = ["128", "256", "512", "whole"]
+    SELECTED_CHUNK_SIZE = os.getenv("SELECTED_CHUNK_SIZE", "512")
     CHUNK_OVERLAP_RATIO = 0.1  # 10% overlap between chunks
 
     # --- Vector store ---
@@ -42,9 +42,9 @@ class Config:
 
     # --- Data paths ---
     DATA_RAW_DIR = "./data/raw"
-    DATA_PROCESSED_DIR = "./data/processed"
+    DATA_PROCESSED_DIR = "./data"
     TRAIN_PAIRS_PATH = f"{DATA_PROCESSED_DIR}/train_pairs.jsonl"
-    EVAL_QUERIES_PATH = f"{DATA_PROCESSED_DIR}/eval_queries.jsonl"
+    EVAL_QUERIES_PATH = f"{DATA_PROCESSED_DIR}/eval_questions.jsonl"
 
     # --- Fine-tuning ---
     FT_EPOCHS = 4

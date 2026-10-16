@@ -15,7 +15,7 @@ This repo demonstrates how to build a domain-specific RAG system that:
 
 - FastAPI backend for querying the RAG pipeline
 - Streamlit dashboard for interactive demos
-- Chunk-size ablation for 256 / 512 / 1024 token settings
+- Chunk-size ablation for 128 / 256 / 512 / whole-document settings
 - Retrieval evaluation with precision@k and related metrics
 - Optional Groq-based answer generation
 - Lightweight test suite for regression safety

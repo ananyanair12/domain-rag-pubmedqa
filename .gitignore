@@ -16,3 +16,4 @@ data/*.jsonl
 models/
 results/
 chroma_db/
+chroma_store/
