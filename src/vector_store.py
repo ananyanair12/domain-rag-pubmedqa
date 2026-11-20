@@ -72,46 +72,45 @@ def collection_name(embedder_kind: str, chunk_size: Union[str, int]) -> str:
     return f"pubmedqa_{embedder_kind}_{chunk_size}"
 
 
-def build_collection(embedder_kind: str, chunk_size: Optional[Union[str, int]] = None):
+def build_collection(embedder_kind: str, chunk_size=None, resume: bool = False):
+    """Embeds chunks in batches and saves each batch to Chroma immediately.
+    resume=False: start fresh (deletes the old collection of the same name).
+    resume=True : continue after an interruption (skips what is already stored).
     """
-    embedder_kind: "baseline" or "finetuned"
-    chunk_size: "128", "256", "512" or "whole" (matches data/chunks_<size>.jsonl)
-    Embeds every chunk with the chosen embedder and stores it in its own
-    Chroma collection, keeping the PMID of each chunk as metadata.
-    """
+    from tqdm import tqdm
     chunk_size = chunk_size or config.SELECTED_CHUNK_SIZE
     chunks_path = DATA_DIR / f"chunks_{chunk_size}.jsonl"
-
     with open(chunks_path, "r", encoding="utf-8") as f:
         chunks = [json.loads(line) for line in f]
 
     embedder = get_embedder(embedder_kind)
-    texts = [c["text"] for c in chunks]
-    ids = [c["chunk_id"] for c in chunks]
-    metadatas = [{"pmid": str(c["pmid"])} for c in chunks]
-
-    print(f"Embedding {len(texts)} chunks with {embedder_kind} model...")
-    embeddings = embedder.encode(texts, show_progress_bar=True, batch_size=32)
-    if hasattr(embeddings, "tolist"):
-        embeddings = embeddings.tolist()
-
     client = get_client()
     name = collection_name(embedder_kind, chunk_size)
-    try:
-        client.delete_collection(name)
-    except Exception:
-        pass
-    collection = client.create_collection(name=name)
 
-    BATCH = 2000
-    for i in range(0, len(ids), BATCH):
+    if not resume:
+        try:
+            client.delete_collection(name)
+        except Exception:
+            pass
+    collection = client.get_or_create_collection(name=name)
+
+    total = len(chunks)
+    done = collection.count()
+    print(f"{name}: {done}/{total} chunks already stored")
+
+    BATCH = 1000
+    for start in tqdm(range(done, total, BATCH), desc=name):
+        batch = chunks[start:start + BATCH]
+        texts = [c["text"] for c in batch]
+        emb = embedder.encode(texts, batch_size=64, show_progress_bar=False)
+        emb = emb.tolist() if hasattr(emb, "tolist") else emb
         collection.add(
-            ids=ids[i:i + BATCH],
-            embeddings=embeddings[i:i + BATCH],
-            documents=texts[i:i + BATCH],
-            metadatas=metadatas[i:i + BATCH],
+            ids=[c["chunk_id"] for c in batch],
+            embeddings=emb,
+            documents=texts,
+            metadatas=[{"pmid": str(c["pmid"])} for c in batch],
         )
-    print(f"Indexed {len(ids)} chunks into collection '{name}'")
+    print(f"Indexed {collection.count()} chunks into collection '{name}'")
     return name
 
 def query_collection(

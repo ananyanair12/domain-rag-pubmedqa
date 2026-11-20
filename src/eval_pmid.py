@@ -10,7 +10,7 @@ from src.evaluate_retrieval import precision_at_k_pmid, hit_at_k, reciprocal_ran
 DATA = Path(__file__).resolve().parent.parent / "data"
 RESULTS = Path(__file__).resolve().parent.parent / "results"
 
-def evaluate(embedder_kind, chunk_size, limit=None, k=5, fetch=10):
+def evaluate(embedder_kind, chunk_size, limit=None, fetch=10):
     rows = [json.loads(l) for l in open(DATA / "eval_questions.jsonl", encoding="utf-8")]
     if limit:
         rows = rows[:limit]
@@ -20,23 +20,26 @@ def evaluate(embedder_kind, chunk_size, limit=None, k=5, fetch=10):
     qvecs = qvecs.tolist() if hasattr(qvecs, "tolist") else qvecs
 
     col = get_client().get_collection(collection_name(embedder_kind, chunk_size))
+    fetch = max(fetch, 10)
     res = col.query(query_embeddings=qvecs, n_results=fetch)
 
-    hits, rrs, precs = [], [], []
+    ks = (1, 3, 5, 10)
+    hit = {kk: [] for kk in ks}
+    rrs, precs = [], []
     for r, metas in zip(rows, res["metadatas"]):
         retrieved = [m["pmid"] for m in metas]
         gold = r["pmid"]
-        hits.append(hit_at_k(retrieved, gold, k))
-        rrs.append(reciprocal_rank(retrieved, gold))
-        precs.append(precision_at_k_pmid(retrieved, gold, k))
+        for kk in ks:
+            hit[kk].append(hit_at_k(retrieved, gold, kk))
+        rrs.append(reciprocal_rank(retrieved[:10], gold))
+        precs.append(precision_at_k_pmid(retrieved, gold, 5))
 
     n = len(rows)
-    out = {
-        "embedder": embedder_kind, "chunk_size": str(chunk_size), "n_questions": n,
-        f"hit@{k}": round(sum(hits) / n, 4),
-        f"mrr@{fetch}": round(sum(rrs) / n, 4),
-        f"precision@{k}": round(sum(precs) / n, 4),
-    }
+    out = {"embedder": embedder_kind, "chunk_size": str(chunk_size), "n_questions": n}
+    for kk in ks:
+        out[f"hit@{kk}"] = round(sum(hit[kk]) / n, 4)
+    out["mrr@10"] = round(sum(rrs) / n, 4)
+    out["precision@5"] = round(sum(precs) / n, 4)
     RESULTS.mkdir(exist_ok=True)
     with open(RESULTS / f"retrieval_{embedder_kind}_{chunk_size}.json", "w") as f:
         json.dump(out, f, indent=2)

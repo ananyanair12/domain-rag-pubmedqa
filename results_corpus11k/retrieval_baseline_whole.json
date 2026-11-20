@@ -1,0 +1,11 @@
+{
+  "embedder": "baseline",
+  "chunk_size": "whole",
+  "n_questions": 1000,
+  "hit@1": 0.882,
+  "hit@3": 0.958,
+  "hit@5": 0.967,
+  "hit@10": 0.976,
+  "mrr@10": 0.9204,
+  "precision@5": 0.1934
+}
