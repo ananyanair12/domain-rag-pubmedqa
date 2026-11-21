@@ -17,3 +17,6 @@ models/
 results/
 chroma_db/
 chroma_store/
+*.safetensors
+*.bin
+*.pt
