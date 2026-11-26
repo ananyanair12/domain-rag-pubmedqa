@@ -7,6 +7,7 @@ models/
 data/raw/
 data/processed/
 *.log
+logs/
 .DS_Store
 venv/
 .venv/
