@@ -5,7 +5,7 @@ from datasets import load_dataset
 random.seed(42)
 OUT = Path(__file__).parent
 N_TRAIN = 20000        # homework pairs (kept small so Colab is fast)
-N_DISTRACTORS = 10000  # extra abstracts in the library
+N_DISTRACTORS = 70000  # extra abstracts in the library
 
 def text_of(ex):
     return " ".join(ex["context"]["contexts"]).strip()
